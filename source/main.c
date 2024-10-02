@@ -1,12 +1,12 @@
+#include <SDL2/SDL_render.h>
+#include <SDL2/SDL_video.h>
 #include <stdbool.h>
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_events.h>
 #include "gb.h"
-
-static bool paused = false;
 
 SDL_Window* window;
 SDL_GLContext* context;
+SDL_Renderer* renderer;
 
 GB_gameboy_t *gb;
 bool should_close = false;
@@ -23,9 +23,9 @@ static void handle_events(void){
 }
 
 static void run(void){
-    while(should_close){
+    while(!should_close){
         handle_events();
-        GB_run(&gb);
+        GB_run(gb);
     }
 }
 
@@ -49,6 +49,8 @@ int main(int argc, char **argv) {
     }
 
     SDL_SetWindowMinimumSize(window, 160, 144);
+
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
     context = SDL_GL_CreateContext(window);
 

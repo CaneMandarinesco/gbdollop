@@ -14,7 +14,7 @@ enum {
 enum {
     GB_IO_JOYP      = 0x00
 
-    // TODO: populate
+    // TODO: populate with hardware addresses
 };
 
 struct GB_gameboy_s {
@@ -31,15 +31,18 @@ struct GB_gameboy_s {
         };
     };
 
-    /* cartridge info */
+    /* cart info */
+    char cart_title[15];
+
+    /* memory */
+    uint8_t *ram;
+    uint8_t *vram;
 };
-typedef GB_gameboy_s GB_gameboy_t;
+typedef struct GB_gameboy_s GB_gameboy_t;
 
 GB_gameboy_t *GB_init(GB_gameboy_t *gb);
-
-/* return time passed in 8MHz ticks */
-unsigned GB_run(GB_gameboy_t *gb);
+GB_gameboy_t *GB_reset_internal(GB_gameboy_t *gb);
+void GB_run(GB_gameboy_t *gb);
 
 
 int GB_load_rom(GB_gameboy_t *gb, const char *path);
-void GB_get_rom_title(GB_gameboy_t *gb, char* title);
