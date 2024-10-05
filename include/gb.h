@@ -1,6 +1,11 @@
 #pragma once
 #include <stdint.h>
 
+#define GB_REGISTER_ORDER f, a, \
+                          c, b, \
+                          e, d, \
+                          l, h
+
 enum {
     GB_REGISTER_AF,
     GB_REGISTER_BC,
