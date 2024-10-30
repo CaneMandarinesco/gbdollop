@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <SDL2/SDL.h>
 #include "gb.h"
+#include <stdio.h>
 
 SDL_Window* window;
 SDL_GLContext* context;
@@ -61,6 +62,8 @@ int main(int argc, char **argv) {
     SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
     SDL_ShowCursor(SDL_DISABLE);
 
+    File* f = open("");
+    
     run();
 
     return 0;
