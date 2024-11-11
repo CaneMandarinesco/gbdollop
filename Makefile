@@ -15,7 +15,7 @@ DEPS = $(OBJS:.o=.d)
 
 # seleziona il compilatore e le sue flag
 CC = gcc
-CFLAGS = -I$(INC_DIR) -Wall -Wextra -MMD -MP -g
+CFLAGS = -I$(INC_DIR) -Wall -Wextra -MMD -MP -g -Wno-unused-parameter -Wno-unused-function
 
 # le librerie da compilare
 LIBS = -lX11 -lGL -lGLU -lm -lSDL2

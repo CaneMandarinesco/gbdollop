@@ -2,8 +2,11 @@
 #include <SDL2/SDL_video.h>
 #include <stdbool.h>
 #include <SDL2/SDL.h>
-#include "gb.h"
 #include <stdio.h>
+
+
+#include "gb.h"
+#include "cpu.h"
 
 SDL_Window* window;
 SDL_GLContext* context;
@@ -31,6 +34,9 @@ static void run(void){
 }
 
 int main(int argc, char **argv) {
+    test_arithmetic();
+    return 0;
+
     SDL_Init(SDL_INIT_EVERYTHING & ~SDL_INIT_AUDIO);
     atexit(SDL_Quit);
 
@@ -61,8 +67,6 @@ int main(int argc, char **argv) {
     // enable dropfile (drag file into window)
     SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
     SDL_ShowCursor(SDL_DISABLE);
-
-    File* f = open("");
     
     run();
 

@@ -1,5 +1,7 @@
 #pragma once
 #include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 #define GB_REGISTER_ORDER f, a, \
                           c, b, \
@@ -29,26 +31,6 @@ enum {
     // TODO: populate with hardware addresses
 };
 
-typedef void write_function_t(GB_gameboy_t* gb, uint16_t addr, uint8_t value); 
-static write_function_t *const write_map[] = {
-    write_rom, write_rom, write_rom, write_rom, // 0000-3FFF
-    write_rom, write_rom, write_rom, write_rom, // 4000-7FFF, switchable bank
-    write_vram, write_vram,  // 8000-9FFF
-    write_null, write_null,  // A000-BFFF external ram
-    write_ram,  write_ram,   // C000-CFFF
-    write_fxxx
-};
-
-typedef uint8_t read_function_t(GB_gameboy_t *gb, uint16_t adr);
-static read_function_t *const read_map[] = {
-    read_rom, read_rom, read_rom, read_rom,
-    read_rom, read_rom, read_rom, read_rom,
-    read_vram, read_vram,
-    read_null, read_null,
-    read_ram, read_ram,
-    read_fxxx
-};
-
 struct GB_gameboy_s {
 
     /* registers */
@@ -73,9 +55,9 @@ struct GB_gameboy_s {
 };
 typedef struct GB_gameboy_s GB_gameboy_t;
 
-
 GB_gameboy_t *GB_init(GB_gameboy_t *gb);
 GB_gameboy_t *GB_reset(GB_gameboy_t *gb);
+GB_gameboy_t *GB_cleanup(GB_gameboy_t *gb);
 void GB_run(GB_gameboy_t *gb);
 
 void GB_write(GB_gameboy_t *gb, uint16_t addr, uint8_t value);
@@ -91,8 +73,13 @@ static void write_vram(GB_gameboy_t* gb, uint16_t addr, uint8_t value);
 static void write_ram(GB_gameboy_t* gb, uint16_t addr, uint8_t value);
 static void write_fxxx(GB_gameboy_t* gb, uint16_t addr, uint8_t value);
 
-static uint8_t read_null(GB_gameboy_t* gb, uint16_t addr) {;}
+static uint8_t read_null(GB_gameboy_t* gb, uint16_t addr) { return 0; }
 static uint8_t read_rom(GB_gameboy_t* gb, uint16_t addr);
 static uint8_t read_vram(GB_gameboy_t* gb, uint16_t addr);
 static uint8_t read_ram(GB_gameboy_t* gb, uint16_t addr);
 static uint8_t read_fxxx(GB_gameboy_t* gb, uint16_t addr);
+
+/* MEMORY READ/WRITE MAPPING */
+
+/* TESTING */
+void test_arithmetic(void);
