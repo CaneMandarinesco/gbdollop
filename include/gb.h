@@ -1,7 +1,6 @@
 #pragma once
 #include <stdint.h>
 #include <stdlib.h>
-#include <stdio.h>
 
 #define GB_REGISTER_ORDER f, a, \
                           c, b, \
@@ -55,18 +54,21 @@ struct GB_gameboy_s {
 };
 typedef struct GB_gameboy_s GB_gameboy_t;
 
+/* GB INIT, RESET, CLEANUP, RUN*/
 GB_gameboy_t *GB_init(GB_gameboy_t *gb);
 GB_gameboy_t *GB_reset(GB_gameboy_t *gb);
 GB_gameboy_t *GB_cleanup(GB_gameboy_t *gb);
 void GB_run(GB_gameboy_t *gb);
 
+/* BUS IO */
 void GB_write(GB_gameboy_t *gb, uint16_t addr, uint8_t value);
 uint8_t GB_read(GB_gameboy_t *gb, uint16_t addr);
 uint16_t GB_read_u16(GB_gameboy_t *gb, uint16_t addr);
 
+/* ROM */
 int GB_load_rom(GB_gameboy_t *gb, const char *path);
 
-/* MEMORY IO FUNCTIONS*/
+/* MEMORY IO MAPPING */
 static void write_null(GB_gameboy_t* gb, uint16_t addr, uint8_t value) {;}
 static void write_rom(GB_gameboy_t* gb, uint16_t addr, uint8_t value);
 static void write_vram(GB_gameboy_t* gb, uint16_t addr, uint8_t value);
@@ -79,7 +81,7 @@ static uint8_t read_vram(GB_gameboy_t* gb, uint16_t addr);
 static uint8_t read_ram(GB_gameboy_t* gb, uint16_t addr);
 static uint8_t read_fxxx(GB_gameboy_t* gb, uint16_t addr);
 
-/* MEMORY READ/WRITE MAPPING */
-
-/* TESTING */
-void test_arithmetic(void);
+/* CONSOLE LOG */
+void GB_log_reg(GB_gameboy_t* gb);
+void GB_log_read(GB_gameboy_t* gb, uint16_t addr, uint16_t value);
+void GB_log_write(GB_gameboy_t* gb, uint16_t addr, uint16_t value);

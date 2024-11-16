@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #define RAM_SIZE  0X1000
 #define VRAM_SIZE 0X2000
@@ -80,21 +81,33 @@ static read_function_t *const read_map[] = {
     read_fxxx
 };
 
+/* useful for logging*/
+static char* const memory_map_names[] = {
+    "ROM", "ROM", "ROM", "ROM",
+    "ROM", "ROM", "ROM", "ROM",
+    "VRAM", "VRAM",
+    "ERAM", "ERAM", /* external ram*/
+    "RAM", "RAM",
+    "FXXX"
+};
+
 void GB_write(GB_gameboy_t *gb, uint16_t addr, uint8_t value){
-    write_map[4 >> addr](gb, addr, value);
-    /* write_map[addr >> 12](gb, addr, value); */
+    write_map[addr >> 12](gb, addr, value);
+    GB_log_write(gb, addr, value);
 }
 void GB_write_u16(GB_gameboy_t *gb, uint16_t addr, uint16_t value) {
-    // TODO: implement u16 write
-    return;
+    GB_write(gb, addr, (uint8_t)(value & (0x00FF)));
+    GB_write(gb, addr+1, (uint8_t)((value & (0xFF00))) >> 8);
 }
 
 uint8_t GB_read(GB_gameboy_t *gb, uint16_t addr){
-    return read_map[4 >> addr](gb, addr);
+    uint16_t value;
+    value = read_map[addr >> 12](gb, addr);
+    GB_log_read(gb, addr, value);
+    return value;
 }
 uint16_t GB_read_u16(GB_gameboy_t *gb, uint16_t addr){
-    // TODO: test
-    return (GB_read(gb, addr) << 4) | GB_read(gb, addr+0x01);
+    return GB_read(gb, addr) | (GB_read(gb, addr+1) << 8);
 }
 
 int GB_load_rom(GB_gameboy_t* gb, const char *path){
@@ -140,28 +153,36 @@ static uint8_t read_fxxx(GB_gameboy_t* gb, uint16_t addr){
     return 0;
 }
 
-void test_arithmetic(void) {
-    GB_gameboy_t* gb;
-    gb = GB_init(gb);
+/* CONSOLE LOG */
+#define CONSOLE_RESET "\033[0m"
+#define CONSOLE_HIGHLIGHT(x) "\033[91m" x CONSOLE_RESET
 
-    printf("Arithmetic test.\n");
-    for(int i = 0x80; i < 0xC0; i++) {
-        uint8_t v = get_register_value(gb, i);
-        printf("\nExectuing opcode: 0x%02x with \n" \
-                  "- reg value: %d (0x%02x) \n" \
-                  "- a: %d (0x%02x)\n" \
-                  "- f: 0x%02x\n", 
-                  i , v, v, gb->a, gb->a, gb->f);
+void GB_log_reg(GB_gameboy_t* gb){
+    printf("[reg] GB register status: \n");
+    printf("> a: "  CONSOLE_HIGHLIGHT("0x%02x") 
+            " f: "  CONSOLE_HIGHLIGHT("0x%02x") 
+            " af: " CONSOLE_HIGHLIGHT("0x%04x") "\n", gb->a, gb->f, gb->af);
+    printf("> b: "  CONSOLE_HIGHLIGHT("0x%02x") 
+            " c: "  CONSOLE_HIGHLIGHT("0x%02x") 
+            " bc: " CONSOLE_HIGHLIGHT("0x%04x") "\n", gb->b, gb->c, gb->bc);
+    printf("> d: "  CONSOLE_HIGHLIGHT("0x%02x") 
+            " e: "  CONSOLE_HIGHLIGHT("0x%02x") 
+            " de: " CONSOLE_HIGHLIGHT("0x%04x") "\n", gb->d, gb->e, gb->de);
+    printf("> h: "  CONSOLE_HIGHLIGHT("0x%02x") 
+            " l: "  CONSOLE_HIGHLIGHT("0x%02x") 
+            " hl: " CONSOLE_HIGHLIGHT("0x%04x") "\n", gb->h, gb->l, gb->hl);
+    printf("> sp: " CONSOLE_HIGHLIGHT("0x%04x") "\n", gb->sp);
+    printf("> pc: " CONSOLE_HIGHLIGHT("0x%04x") "\n", gb->pc);
+}
 
-        exec_instr(gb, i);
+void GB_log_read(GB_gameboy_t* gb, uint16_t addr, uint16_t value) {
+    printf("[GB_read] Read addr: " CONSOLE_HIGHLIGHT("0x%04x") 
+           ", value: " CONSOLE_HIGHLIGHT("0x%02x") "\n", addr, value);
+    printf("> Memory area: " CONSOLE_HIGHLIGHT("%s") "\n", memory_map_names[addr >> 12]);
+}
 
-        printf("Results: \n" \
-                "- a: %d (0x%02x)\n" \
-                "- f: 0x%02x\n",
-                gb->a, gb->a, gb->f);
-
-        getchar();
-    }
-
-    GB_cleanup(gb);
+void GB_log_write(GB_gameboy_t* gb, uint16_t addr, uint16_t value){
+    printf("[GB_write] Write addr: " CONSOLE_HIGHLIGHT("0x%04x") 
+           ", value: " CONSOLE_HIGHLIGHT("0x%02x") "\n", addr, value);
+    printf("> Memory area: " CONSOLE_HIGHLIGHT("%s") "\n", memory_map_names[addr >> 12]);
 }

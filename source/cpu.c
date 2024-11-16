@@ -14,30 +14,35 @@
  */
 
 // NOTE: ## is a concatenation operator
+/* LD X, Y */
 #define LD_X_Y(x, y) \ 
 static void ld_##x##_##y(GB_gameboy_t *gb, uint8_t opcode) \
 { \
     gb->x = gb->y; \
 }
 
+/* LD X, [HL] */
 #define LD_X_DHL(x) \
 static void ld_##x##_##dhl(GB_gameboy_t *gb, uint8_t opcode) \
 { \
     gb->x = GB_read(gb, gb->hl);\
 }
 
+/* LD [HL], R8*/
 #define LD_DHL_Y(y) \
 static void ld_##dhl##_##y(GB_gameboy_t *gb, uint8_t opcode) \ 
 { \
     GB_write(gb, gb->hl, gb->y); \ 
 }
 
+/* INC R16*/
 #define INC_XX(xx) \ 
 static void inc_##xx(GB_gameboy_t *gb, uint8_t opcode) \ 
 { \
     gb->xx++; \ 
 }
 
+/* DEC R16*/
 #define DEC_XX(xx) \ 
 static void dec_##xx(GB_gameboy_t *gb, uint8_t opcode) \ 
 { \
@@ -64,54 +69,94 @@ DEC_XX(bc) DEC_XX(de) DEC_XX(hl) DEC_XX(sp)
 /* all other instructions are hand written */
 static void nop(GB_gameboy_t *gb, uint8_t opcode) {}
 
+/* INC R8*/
+// inc_hr for instructions operating on higher 8-bit of the 16-bit regs
 static void inc_hr(GB_gameboy_t* gb, uint8_t opcode) {
-    // FIXME
+    // select the 16 bit reg and get the right value
     uint8_t reg_id = ((opcode & 0xF0) >> 4) + 1;
-    uint8_t value = (gb->registers[reg_id] >> 4);
+    uint8_t value = (gb->registers[reg_id] >> 8); 
 
+    // reset affected flags and ZERO_FLAG
+    gb->f &= ~(GB_HALF_CARRY_FLAG | GB_ZERO_FLAG | GB_SUBTRACT_FLAG);
+
+    // check flags
     if((value & 0x0F) == 0x0F) gb->f |= GB_HALF_CARRY_FLAG;
     value++;
     if(value == 0x00) gb->f |= GB_ZERO_FLAG;
-    gb->f |= GB_SUBTRACT_FLAG;
 
-    gb->registers[reg_id] &= (value << 4) | 0x0F;
+    // clean hi bits
+    gb->registers[reg_id] &= 0x00FF;
+    // set hi bits
+    gb->registers[reg_id] |= (0xFF00 & (value << 8));
 }
+// inc_lr for instructions operating on lower 8-bits of the 16-bit regs
 static void inc_lr(GB_gameboy_t* gb, uint8_t opcode){
-    // FIXME
     uint8_t reg_id = ((opcode & 0xF0) >> 4) + 1;
     uint8_t value = gb->registers[reg_id];
 
+    gb->f &= ~(GB_HALF_CARRY_FLAG | GB_ZERO_FLAG | GB_SUBTRACT_FLAG);
+
     if((value & 0x0F) == 0x0F) gb->f |= GB_HALF_CARRY_FLAG;
     value++;
     if(value == 0x00) gb->f |= GB_ZERO_FLAG;
-    gb->f |= GB_SUBTRACT_FLAG;
 
-    gb->registers[reg_id] &= value ;
+    gb->registers[reg_id] &= 0xFF00;
+    gb->registers[reg_id] |= (0x00FF & value) ;
+}
+// INC A has it's own function
+static void inc_a(GB_gameboy_t* gb, uint8_t opcode) {
+    uint8_t value = gb->a;
+
+    gb->f &= ~(GB_HALF_CARRY_FLAG | GB_ZERO_FLAG | GB_SUBTRACT_FLAG);
+    
+    if((value & 0x0F) == 0x0F) gb->f |= GB_HALF_CARRY_FLAG;
+    value++;
+    if(value == 0x00) gb->f |= GB_ZERO_FLAG;
+
+    gb->a = value;
 }
 
+/* DEC R8 */
+// similar to INC R8
 static void dec_hr(GB_gameboy_t* gb, uint8_t opcode) {
-    // FIXME
     uint8_t reg_id = ((opcode & 0xF0) >> 4) + 1;
-    uint8_t value = gb->registers[reg_id] >> 4;
+    uint8_t value = gb->registers[reg_id] >> 8;
+
+    gb->f &= ~(GB_HALF_CARRY_FLAG | GB_ZERO_FLAG);
 
     if((value & 0x0F) == 0x00) gb->f |= GB_HALF_CARRY_FLAG;
     value--;
     if(value == 0x00) gb->f |= GB_ZERO_FLAG;
     gb->f |= GB_SUBTRACT_FLAG;
 
-    gb->registers[reg_id] &= (value << 4) | 0x0F;
+    gb->registers[reg_id] &= 0x00FF;
+    gb->registers[reg_id] |= ((value << 8) & 0xFF00);
 }
 static void dec_lr(GB_gameboy_t* gb, uint8_t opcode){
-    // FIXME
     uint8_t reg_id = ((opcode & 0xF0) >> 4) + 1;
     uint8_t value = gb->registers[reg_id];
+
+    gb->f &= ~(GB_HALF_CARRY_FLAG | GB_ZERO_FLAG);
 
     if((value & 0x0F) == 0x00) gb->f |= GB_HALF_CARRY_FLAG;
     value--;
     if(value == 0x00) gb->f |= GB_ZERO_FLAG;
     gb->f |= GB_SUBTRACT_FLAG;
 
-    gb->registers[reg_id] &= value;
+    gb->registers[reg_id] &= 0xFF00;
+    gb->registers[reg_id] |= (0x00FF & value);
+}
+static void dec_a(GB_gameboy_t* gb, uint8_t opcode) {
+    uint8_t value = gb->a;
+
+    gb->f &= ~(GB_HALF_CARRY_FLAG | GB_ZERO_FLAG);
+
+    if((value & 0x0F) == 0x00) gb->f |= GB_HALF_CARRY_FLAG;
+    value--;
+    if(value == 0x00) gb->f |= GB_ZERO_FLAG;
+    gb->f |= GB_SUBTRACT_FLAG;
+
+    gb->a = value;
 }
 
 /* ARITHMETIC OPERATIONS */
@@ -129,6 +174,7 @@ uint8_t get_register_value(GB_gameboy_t* gb, uint8_t opcode) {
     return gb->registers[reg_id] >> 8 * apply_shift;
 } 
 
+/* ADD A,R8 & ADC A,R8*/
 static void add_r(GB_gameboy_t* gb, uint8_t opcode) {
     uint8_t value = get_register_value(gb, opcode);
     uint8_t carry = 0;
@@ -154,6 +200,7 @@ static void add_r(GB_gameboy_t* gb, uint8_t opcode) {
     // check if result is zero
     if(gb->a == 0x00) gb->f |= GB_ZERO_FLAG;
 }
+/* SUB A,R8 & SBC A,R8*/
 static void sub_r(GB_gameboy_t* gb, uint8_t opcode) {
     /* similar to add_r */
     uint8_t value = get_register_value(gb, opcode);
@@ -171,6 +218,7 @@ static void sub_r(GB_gameboy_t* gb, uint8_t opcode) {
 
     if(gb->a == 0x00) gb->f |= GB_ZERO_FLAG;
 }
+/* AND A,R8*/
 static void and_r(GB_gameboy_t* gb, uint8_t opcode) {
     uint8_t value = get_register_value(gb, opcode);
 
@@ -184,6 +232,7 @@ static void and_r(GB_gameboy_t* gb, uint8_t opcode) {
     gb->f &= ~GB_SUBTRACT_FLAG;
     gb->f &= ~GB_CARRY_FLAG;
 }
+/* XOR A,R8*/
 static void xor_r(GB_gameboy_t* gb, uint8_t opcode) {
     uint8_t value = get_register_value(gb, opcode);
     gb->registers[GB_REGISTER_AF] ^= value << 8;
@@ -192,6 +241,7 @@ static void xor_r(GB_gameboy_t* gb, uint8_t opcode) {
     gb->f &= ~GB_SUBTRACT_FLAG; 
     gb->f &= ~GB_CARRY_FLAG; 
 }
+/* OR  A, R8*/
 static void or_r(GB_gameboy_t* gb, uint8_t opcode) {
     uint8_t value = get_register_value(gb, opcode);
     gb->registers[GB_REGISTER_AF] |= value << 8;
@@ -200,6 +250,7 @@ static void or_r(GB_gameboy_t* gb, uint8_t opcode) {
     gb->f &= ~GB_SUBTRACT_FLAG;
     gb->f &= ~GB_CARRY_FLAG;
 }
+/* CP  A, R8*/
 static void cp_r(GB_gameboy_t* gb, uint8_t opcode) {
     uint8_t value = get_register_value(gb, opcode);
     uint8_t a = gb->a;
@@ -207,9 +258,10 @@ static void cp_r(GB_gameboy_t* gb, uint8_t opcode) {
  
     if ( a == value )
         gb->f |= GB_ZERO_FLAG;
-    if(((a & 0x0F) - (value & 0x0F)) > 0x0F) 
+    if((a & 0x0F) < (value & 0x0F)) 
         gb->f |= GB_HALF_CARRY_FLAG;
-    if((a - value) > 0xFF) 
+
+    if(a < value) 
         gb->f |= GB_CARRY_FLAG;
 }
 
@@ -235,25 +287,17 @@ static void add_hl_rr(GB_gameboy_t* gb, uint8_t opcode) {
     gb->hl += value;
 }
 
-/* LD instructions */
-static void ld_rr_d16(GB_gameboy_t *gb, uint8_t opcode) {}
-static void ld_drr_a(GB_gameboy_t *gb, uint8_t opcode) {}
-static void ld_r_d8(GB_gameboy_t *gb, uint8_t opcode) {}
-static void ld_a_drr(GB_gameboy_t *gb, uint8_t opcode) {}
-static void ld_dd16_a(GB_gameboy_t *gb, uint8_t opcode) {}
-static void ld_a_dd16(GB_gameboy_t *gb, uint8_t opcode) {}
-static void ld_dd16_sp(GB_gameboy_t *gb, uint8_t opcode) {}
-
 /* arithmetic/logical [HL] instructions */
 /* INC [HL] */
 static void inc_dhl(GB_gameboy_t *gb, uint8_t opcode){
     uint8_t value = GB_read(gb, gb->hl);
 
-    // Preserve CARRY_FLAG value
-    gb->f &= GB_CARRY_FLAG;
-    // SUBTRACT_FLAG is set to zero
-    if(value == 0xFF) gb->f |= GB_ZERO_FLAG;
-    if(value == 0x0F) gb->f |= GB_HALF_CARRY_FLAG;
+    // same as INC R8 
+    gb->f &= ~(GB_HALF_CARRY_FLAG | GB_ZERO_FLAG | GB_SUBTRACT_FLAG);
+
+    if((value & 0x0F) == 0x0F) gb->f |= GB_HALF_CARRY_FLAG;
+    value++;
+    if(value == 0x00) gb->f |= GB_ZERO_FLAG;
 
     GB_write(gb, gb->hl, value+1);
 }
@@ -262,16 +306,113 @@ static void dec_dhl(GB_gameboy_t *gb, uint8_t opcode){
 
     uint8_t value = GB_read(gb, gb->hl);
 
+    // same as DEC R8
+    gb->f &= ~(GB_HALF_CARRY_FLAG | GB_ZERO_FLAG);
+
+    if((value & 0x0F) == 0x00) gb->f |= GB_HALF_CARRY_FLAG;
+    value--;
+    if(value == 0x00) gb->f |= GB_ZERO_FLAG;
+    gb->f |= GB_SUBTRACT_FLAG;
+
     GB_write(gb, gb->hl, value-1);
 }
-static void add_a_dhl(GB_gameboy_t *gb, uint8_t opcode) {}
-static void sub_a_dhl(GB_gameboy_t *gb, uint8_t opcode) {}
-static void and_a_dhl(GB_gameboy_t *gb, uint8_t opcode) {}
-static void or_a_dhl(GB_gameboy_t *gb, uint8_t opcode) {}
-static void xor_a_dhl(GB_gameboy_t *gb, uint8_t opcode) {}
-static void cp_a_dhl(GB_gameboy_t *gb, uint8_t opcode) {}
+/* ADD A,[HL] & ADC A,[HL]*/
+static void add_a_dhl(GB_gameboy_t *gb, uint8_t opcode) {
+    uint8_t value = GB_read(gb, gb->hl);
+    uint8_t carry = 0;
 
-static void halt(GB_gameboy_t *gb, uint8_t opcode) {}
+    if((opcode & 0x08) == 0x08) carry = (gb->f & GB_CARRY_FLAG) != 0;
+    gb->f = 0x00;
+
+    if(((gb->a & 0x0F) + (value & 0x0F) + carry) > 0x0F) 
+        gb->f |= GB_HALF_CARRY_FLAG;
+    if((gb->a + value + carry) > 0xFF) 
+        gb->f |= GB_CARRY_FLAG;
+
+    gb->a += value + carry ;
+
+    if(gb->a == 0x00) gb->f |= GB_ZERO_FLAG;
+}
+/* SUB A,[HL] & SBC A,[HL]*/
+static void sub_a_dhl(GB_gameboy_t *gb, uint8_t opcode) {
+    uint8_t value = GB_read(gb, gb->hl);
+    uint8_t carry = 0;
+
+    if((opcode  & 0x08) == 0x08) carry = ((gb->f & GB_CARRY_FLAG) != 0);
+
+    gb->f = 0x00;
+
+    if( ((value - carry) & 0x0F) > (gb->a & 0x0F) ) gb->f |= GB_HALF_CARRY_FLAG;
+    if( (value - carry) > gb->a ) gb->f |= GB_CARRY_FLAG;
+
+    gb->a -= value - carry;
+
+    if(gb->a == 0x00) gb->f |= GB_ZERO_FLAG;
+}
+/* AND A,[HL]*/
+static void and_a_dhl(GB_gameboy_t *gb, uint8_t opcode) {
+    uint8_t value = GB_read(gb, gb->hl);
+
+    // load `value` in register a, and fill with 0x00 register f
+    gb->registers[GB_REGISTER_AF] &= value << 8;
+
+    if (gb->a == 0x00) gb->f |= GB_ZERO_FLAG;
+
+    // why? because documentation says to do this!
+    gb->f |= GB_HALF_CARRY_FLAG;
+    gb->f &= ~GB_SUBTRACT_FLAG;
+    gb->f &= ~GB_CARRY_FLAG;
+}
+/* OR A,[HL]*/
+static void or_a_dhl(GB_gameboy_t *gb, uint8_t opcode) {
+    uint8_t value = GB_read(gb, gb->hl);
+    gb->registers[GB_REGISTER_AF] |= value << 8;
+    if (gb->a == 0x00) gb->f |= GB_ZERO_FLAG;
+    gb->f &= ~GB_HALF_CARRY_FLAG;
+    gb->f &= ~GB_SUBTRACT_FLAG;
+    gb->f &= ~GB_CARRY_FLAG;
+}
+/* XOR A,[HL]*/
+static void xor_a_dhl(GB_gameboy_t *gb, uint8_t opcode) {
+    uint8_t value = GB_read(gb, gb->hl);
+    gb->registers[GB_REGISTER_AF] ^= value << 8;
+    if (gb->a == 0x00) gb->f |= GB_ZERO_FLAG; 
+    gb->f &= ~GB_HALF_CARRY_FLAG; 
+    gb->f &= ~GB_SUBTRACT_FLAG; 
+    gb->f &= ~GB_CARRY_FLAG; 
+}
+/* CP A,[HL]*/
+static void cp_a_dhl(GB_gameboy_t *gb, uint8_t opcode) {
+    uint8_t value = GB_read(gb, gb->hl);
+    uint8_t a = gb->a;
+    gb->f = GB_SUBTRACT_FLAG; /* gb->f = 0; gb->f |= GB_SUBTRACT_FLAG*/
+ 
+    if ( a == value )
+        gb->f |= GB_ZERO_FLAG;
+    if((a & 0x0F) < (value & 0x0F)) 
+        gb->f |= GB_HALF_CARRY_FLAG;
+
+    if(a < value) 
+        gb->f |= GB_CARRY_FLAG;
+}
+
+/* LD instructions */
+/* LD R16,D16*/
+static void ld_rr_d16(GB_gameboy_t *gb, uint8_t opcode) {
+    uint8_t reg_id = (opcode >> 4) + 1;
+    // data to load in r16 is stored after pc
+    gb->registers[reg_id] =  GB_read_u16(gb, gb->pc+1);
+    gb->pc+=2;
+}
+static void ld_drr_a(GB_gameboy_t *gb, uint8_t opcode) {}
+static void ld_r_d8(GB_gameboy_t *gb, uint8_t opcode) {}
+static void ld_a_drr(GB_gameboy_t *gb, uint8_t opcode) {}
+static void ld_dd16_a(GB_gameboy_t *gb, uint8_t opcode) {}
+static void ld_a_dd16(GB_gameboy_t *gb, uint8_t opcode) {}
+static void ld_dd16_sp(GB_gameboy_t *gb, uint8_t opcode) {}
+
+
+static void halt(GB_gameboy_t *gb, uint8_t opcode) { /* TODO: implement*/}
 
 static opcode_t *
 opcodes[256] = {
@@ -287,7 +428,7 @@ opcodes[256] = {
     nop,        add_hl_rr,  ld_a_dhl,  dec_hl,   inc_lr,    dec_lr,    ld_r_d8,   nop,
     
     nop,        ld_rr_d16,  ld_dhl_a,  inc_sp,   inc_dhl,  dec_dhl,  nop,       nop, // 0x3
-    nop,        add_hl_rr,  ld_a_dhl,  dec_sp,   inc_hr,    dec_hr,    ld_r_d8,   nop,
+    nop,        add_hl_rr,  ld_a_dhl,  dec_sp,   inc_a,    dec_a,    ld_r_d8,   nop,
     
     ld_b_b,     ld_b_c,     ld_b_d,    ld_b_e,   ld_b_h,   ld_b_l,   ld_b_dhl,  ld_b_a, // 0x4
     ld_c_b,     ld_c_c,     ld_c_d,    ld_c_e,   ld_c_h,   ld_c_l,   ld_c_dhl,  ld_c_a,

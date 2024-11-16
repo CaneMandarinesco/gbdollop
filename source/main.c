@@ -7,6 +7,7 @@
 
 #include "gb.h"
 #include "cpu.h"
+#include "test.h"
 
 SDL_Window* window;
 SDL_GLContext* context;
@@ -34,7 +35,7 @@ static void run(void){
 }
 
 int main(int argc, char **argv) {
-    test_arithmetic();
+    test_arithmetic_dhl();
     return 0;
 
     SDL_Init(SDL_INIT_EVERYTHING & ~SDL_INIT_AUDIO);
