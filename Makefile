@@ -18,7 +18,7 @@ CC = gcc
 CFLAGS = -I$(INC_DIR) -Wall -Wextra -MMD -MP -g -Wno-unused-parameter -Wno-unused-function
 
 # le librerie da compilare
-LIBS = -lX11 -lGL -lGLU -lm -lSDL2
+LIBS = -lm
 
 # definisci come compilare e effettuare il link
 $(TARGET): $(OBJS)

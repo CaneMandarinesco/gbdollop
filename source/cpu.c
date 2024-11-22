@@ -408,6 +408,7 @@ static void ld_rr_d16(GB_gameboy_t *gb, uint8_t opcode) {
     gb->pc+=2;
 }
 
+/* LD [R16], A*/
 static void ld_drr_a(GB_gameboy_t *gb, uint8_t opcode) {
     uint8_t reg_id = ((opcode > 4) + 1);
     uint8_t addr = gb->registers[reg_id];
@@ -422,14 +423,72 @@ static void ld_dhli_a(GB_gameboy_t *gb, uint8_t opcode) {
 static void ld_dhld_a(GB_gameboy_t *gb, uint8_t opcode) {
     GB_write(gb, gb->a, gb->hl);
     gb->hl--;
+} 
+
+/* LD r8,n8 */
+static void ld_r_d8(GB_gameboy_t *gb, uint8_t opcode) {
+
+    uint8_t value = GB_read(gb, ++gb->pc);
+    
+    if(opcode == 0x3E) { 
+        gb->a = value;
+        return;
+    }
+
+    uint8_t reg_id = (opcode & 0xF0) + 1;
+    gb->registers[reg_id] = value <<  ((opcode & 0x06 == 0) ? 8 : 0);
 }
 
-static void ld_r_d8(GB_gameboy_t *gb, uint8_t opcode) {}
-static void ld_a_drr(GB_gameboy_t *gb, uint8_t opcode) {}
-static void ld_dd16_a(GB_gameboy_t *gb, uint8_t opcode) {}
-static void ld_a_dd16(GB_gameboy_t *gb, uint8_t opcode) {}
-static void ld_dd16_sp(GB_gameboy_t *gb, uint8_t opcode) {}
+static void ld_hl_d8(GB_gameboy_t *gb, uint8_t opcode) {
+    uint8_t value = GB_read(gb, ++gb->pc);
 
+    GB_write(gb, gb->hl, value);
+}
+
+/* LD A, [R16]*/
+static void ld_a_drr(GB_gameboy_t *gb, uint8_t opcode) {
+    uint8_t reg_id = (opcode & 0xF0) + 1;
+    uint8_t addr = gb->registers[reg_id]; 
+    uint8_t value = GB_read(gb, addr);
+
+    gb->a = value;
+}
+
+static void ld_a_dhli(GB_gameboy_t *gb, uint8_t opcode) {
+    uint8_t value = GB_read(gb, gb->hl++);
+
+    gb->a = value;
+}
+static void ld_a_dhld(GB_gameboy_t *gb, uint8_t opcode) {
+    uint8_t value = GB_read(gb, gb->hl--);
+
+    gb->a = value;
+}
+
+static void ld_dd16_sp(GB_gameboy_t *gb, uint8_t opcode) {
+    uint8_t lo = gb->sp & 0xFF;
+    uint8_t hi = gb->sp > 8;
+
+    uint8_t addr_lo = GB_read(gb, ++gb->pc);
+    uint8_t addr_hi = GB_read(gb, --gb->pc);
+    uint16_t addr   = addr_lo | addr_hi;
+
+    GB_write(gb, addr, gb->sp&0xFF);
+    GB_write(gb, addr+1, gb->sp > 8);
+
+}
+
+static void rlca(GB_gameboy_t *gb, uint8_t opcode){
+    uint8_t value = gb->a < 1;
+    gb->f = GB_CARRY_FLAG * (gb->a > 7);
+    // TODO: finish
+}
+
+/* JUMP */
+static void jp_d16(GB_gameboy_t *gb, uint8_t opcode){
+    uint16_t value = GB_read_u16(gb, gb->pc+1);
+    gb->pc = value;
+}
 
 static void halt(GB_gameboy_t *gb, uint8_t opcode) { /* TODO: implement*/}
 
@@ -438,16 +497,16 @@ opcodes[256] = {
 //  0x0         0x1         0x2        0x3       0x4       0x5       0x6        0x7
 //  0x8         0x9         0xA        0xB       0xC       0xD       0xE        0xF
     nop,        ld_rr_d16,  ld_drr_a,  inc_bc,   inc_hr,    dec_hr,    ld_r_d8,   nop, // 0x0
-    ld_dd16_sp, add_hl_rr,  nop,       dec_bc,   inc_lr,    dec_lr,    ld_r_d8,   nop,
+    ld_dd16_sp, add_hl_rr,  ld_a_drr,  dec_bc,   inc_lr,    dec_lr,    ld_r_d8,   nop,
 
     nop,        ld_rr_d16,  ld_drr_a,  inc_de,   inc_hr,    dec_hr,    ld_r_d8,   nop, // 0x1
-    nop,        add_hl_rr,  nop,       dec_de,   inc_lr,    dec_lr,    ld_r_d8,   nop,
+    nop,        add_hl_rr,  ld_a_drr,  dec_de,   inc_lr,    dec_lr,    ld_r_d8,   nop,
 
-    nop,        ld_rr_d16,  ld_dhli_a,  inc_hl,   inc_hr,    dec_hr,    ld_r_d8,   nop, // 0x2
-    nop,        add_hl_rr,  ld_a_dhl,  dec_hl,   inc_lr,    dec_lr,    ld_r_d8,   nop,
+    nop,        ld_rr_d16,  ld_dhli_a, inc_hl,   inc_hr,    dec_hr,    ld_r_d8,   nop, // 0x2
+    nop,        add_hl_rr,  ld_a_dhli, dec_hl,   inc_lr,    dec_lr,    ld_r_d8,   nop,
     
-    nop,        ld_rr_d16,  ld_dhld_a,  inc_sp,   inc_dhl,  dec_dhl,  nop,       nop, // 0x3
-    nop,        add_hl_rr,  ld_a_dhl,  dec_sp,   inc_a,    dec_a,    ld_r_d8,   nop,
+    nop,        ld_rr_d16,  ld_dhld_a, inc_sp,   inc_dhl,  dec_dhl,  ld_hl_d8,       nop, // 0x3
+    nop,        add_hl_rr,  ld_a_dhld, dec_sp,   inc_a,    dec_a,    ld_r_d8,   nop,
     
     ld_b_b,     ld_b_c,     ld_b_d,    ld_b_e,   ld_b_h,   ld_b_l,   ld_b_dhl,  ld_b_a, // 0x4
     ld_c_b,     ld_c_c,     ld_c_d,    ld_c_e,   ld_c_h,   ld_c_l,   ld_c_dhl,  ld_c_a,
@@ -473,7 +532,7 @@ opcodes[256] = {
     or_r,       or_r,       or_r,      or_r,     or_r,     or_r,     or_a_dhl,  or_r, // 0xB
     cp_r,       cp_r,       cp_r,      cp_r,     cp_r,     cp_r,     cp_a_dhl,  cp_r,
     
-    nop, nop, nop, nop, nop, nop, nop, nop,  // 0xC
+    nop, nop, nop, jp_d16, nop, nop, nop, nop,  // 0xC
     nop, nop, nop, nop, nop, nop, nop, nop,
     
     nop, nop, nop, nop, nop, nop, nop, nop,  // 0xD

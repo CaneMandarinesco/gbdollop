@@ -7,13 +7,10 @@
 
 #define RAM_SIZE  0X1000
 #define VRAM_SIZE 0X2000
-#define MBC_SIZE  0X4000
+#define MBC_SIZE  0X8000
 
 GB_gameboy_t *GB_init(GB_gameboy_t *gb) {
     gb = malloc(sizeof(GB_gameboy_t));
-    // fill with 0 gameboy data area
-    // memset(gb, 0, sizeof(GB_gameboy_t));
-
 
     // 4kib = 2^2 * 2^10 = 2^12
     // 16^3 = 2^12 ->           0x1000 = 4kib
@@ -21,6 +18,7 @@ GB_gameboy_t *GB_init(GB_gameboy_t *gb) {
     // 16kib = 2^4 * 2^10 = 2^14
     // 16^3 = 2^12 -> 2^2 * 2^12 = 2^14 
     //                          0x4000 = 16kib
+    //                          0x8000 = 32kib
 
     gb->ram  = malloc(RAM_SIZE);
     gb->vram = malloc(VRAM_SIZE);
@@ -58,7 +56,16 @@ GB_gameboy_t* GB_cleanup(GB_gameboy_t *gb){
 }
 
 void GB_run(GB_gameboy_t *gb) {
-    // TODO: implement GB_run
+    int running = 0;
+    while(!running){
+        uint8_t opcode = GB_read(gb, gb->pc);
+        printf("(pc: 0x%04x) executing: 0x%02x\n", gb->pc, opcode);
+
+        exec_instr(gb, opcode);
+        gb->pc++;
+
+        if((char)getchar() == 'e') running = 1;
+    }
 }
 
 typedef void write_function_t(GB_gameboy_t* gb, uint16_t addr, uint8_t value); 
@@ -111,6 +118,40 @@ uint16_t GB_read_u16(GB_gameboy_t *gb, uint16_t addr){
 }
 
 int GB_load_rom(GB_gameboy_t* gb, const char *path){
+    FILE* f = fopen(path, "rb");
+    
+    if(!f) {
+        fprintf(stderr, "[GB_load_rom] colud not open file: %s \n", path);
+        return -1;
+    }
+
+    // assume we are loading no mbc cartridges, fixed size of 32kib
+    if(fread(gb->mbc, sizeof(*gb->mbc), MBC_SIZE, f) != MBC_SIZE){
+        fprintf(stderr, "[GB_load_rom] error while reading file: %s\n", path);
+        return -1;
+    }
+    fclose(f);
+
+    printf("loaded rom: %s\n", path);
+
+    char name[15] = "";
+    memcpy(name, (void*) &gb->mbc[0x134], 15);
+    printf("cart name: %s\n", name);
+
+    uint8_t cart_type = gb->mbc[0x147];
+    // printf("cart type: 0x%02x\n", cart_type);
+
+    uint8_t rom_size = gb->mbc[0x148];
+    // printf("cart size: 0x%02x\n", rom_size);
+
+    if(cart_type != 0x00) {
+        fprintf(stderr, "rom not supported (can only emulate ROM ONLY cartridges)\n");
+        return -1;
+    }
+    if(rom_size  != 0x00) {
+        fprintf(stderr, "rom not supported (can only run 32Kib roms)");
+        return -1;
+    }
 
     return 0;
 }
